@@ -34,8 +34,8 @@ venv\Scripts\activate
 1. **Clone the Repository**
 
    ```bash
-   git clone https://github.com/AhmedUtkuOzudogru/YourMailAssistant.git
-   cd YourMailAssistant
+   git clone https://github.com/AhmedUtkuOzudogru/MailAssistant.git
+   cd MailAssistant
    ```
 
 2. **Install Dependencies**
