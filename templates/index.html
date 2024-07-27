@@ -4,56 +4,71 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Email Assistant</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
     <div class="container mt-5">
         <h1>Email Assistant</h1>
+
         <div class="row">
             <div class="col-md-4">
                 <h2>Emails</h2>
-                <ul class="list-group" id="email-list">
+                <button id="refresh-btn" class="btn btn-primary mb-3">Refresh Emails</button>
+                <ul id="email-list">
                     {% for email in emails %}
-                    <li class="list-group-item" data-filename="{{ email.filename }}">
-                        {{ email.id }} - {{ email.account }} - {{ email.subject }}
-                    </li>
+                    <li data-filename="{{ email.filename }}">{{ email.id }} - {{ email.account }} - {{ email.subject }}</li>
                     {% endfor %}
                 </ul>
             </div>
+
             <div class="col-md-8">
                 <h2>Email Content</h2>
                 <div id="email-content"></div>
+
                 <div class="mt-3">
-                    <button id="read-btn" class="btn btn-primary">Read Aloud</button>
-                    <button id="summarize-btn" class="btn btn-secondary">Summarize</button>
+                    <button id="read-aloud-btn" class="btn btn-secondary" style="display: none;">Read Aloud</button>
+                    <button id="summarize-btn" class="btn btn-info" style="display: none;">Summarize</button>
                 </div>
-                <audio id="audio-player" controls class="mt-3" style="display: none;"></audio>
+                  <audio id="audio" controls class="mt-3" style="display: none;"></audio>
             </div>
         </div>
     </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script>
         $(document).ready(function() {
-            let currentFilename = null;
+            let selectedFilename = null;
 
-            $('#email-list').on('click', 'li', function() {
-                currentFilename = $(this).data('filename');
-                $.get('/read/' + currentFilename, function(data) {
-                    $('#email-content').text(data.content);
+            $('#refresh-btn').click(function() {
+                $.get('/refresh', function(data) {
+                    $('#email-list').empty();
+                    data.emails.forEach(function(email) {
+                        $('#email-list').append(`<li data-filename="${email.filename}">${email.id} - ${email.account} - ${email.subject}</li>`);
+                    });
                 });
             });
 
-            $('#read-btn').click(function() {
-                if (currentFilename) {
-                    $.get('/tts/' + currentFilename, function(data) {
-                        $('#audio-player').attr('src', '/static/' + data.audio_file).show()[0].play();
+            $(document).on('click', '#email-list li', function() {
+                selectedFilename = $(this).data('filename');
+                $.get('/read/' + selectedFilename, function(data) {
+                    $('#email-content').text(data.content);
+                    $('#read-aloud-btn, #summarize-btn').show();
+                });
+            });
+
+            $('#read-aloud-btn').click(function() {
+                if (selectedFilename) {
+                    $.get('/tts/' + selectedFilename, function(data) {
+                        let audio = $('#audio');
+                        audio.attr('src', '/static/' + data.audio_file);
+                        audio.show();
+                        audio[0].play();
                     });
                 }
             });
-
             $('#summarize-btn').click(function() {
-                if (currentFilename) {
-                    $.get('/summarize/' + currentFilename, function(data) {
+                if (selectedFilename) {
+                    $.get('/summarize/' + selectedFilename, function(data) {
                         $('#email-content').text(data.summary);
                     });
                 }

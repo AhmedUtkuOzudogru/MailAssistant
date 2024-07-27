@@ -50,6 +50,14 @@ class EmailAssistant:
                     email_counter += 1
         return emails
 
+    def clear_emails(self):
+        for filename in os.listdir('emails'):
+            if filename.endswith('.txt'):
+                os.remove(os.path.join('emails', filename))
+        for filename in os.listdir('static'):
+            if filename.endswith('.mp3'):
+                os.remove(os.path.join('static', filename))
+
     def read_email(self, filename):
         full_path = os.path.join('emails', filename)
         with open(full_path, 'r', encoding='utf-8') as f:
@@ -70,6 +78,9 @@ class EmailAssistant:
         with open(output_path, 'r', encoding='utf-8') as f:
             summary = f.read()
         return summary
+
+
+
 
 
 email_assistant = EmailAssistant()
@@ -97,6 +108,10 @@ def text_to_speech(filename):
 def summarize_email(filename):
     summary = email_assistant.summarize_email(filename)
     return jsonify({'summary': summary})
+@app.route('/refresh')
+def refresh_emails():
+    emails = email_assistant.fetch_emails()
+    return jsonify({'emails': emails or []})
 
 
 # Cleanup function
