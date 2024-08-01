@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Email Assistant</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
     <div class="container mt-5">
@@ -13,10 +14,25 @@
         <div class="row">
             <div class="col-md-4">
                 <h2>Emails</h2>
-                <button id="refresh-btn" class="btn btn-primary mb-3">Refresh Emails</button>
-                <ul id="email-list">
-                    {% for email in emails %}
-                    <li data-filename="{{ email.filename }}">{{ email.id }} - {{ email.account }} - {{ email.subject }}</li>
+
+                <h3>Unseen Emails</h3>
+                <ul id="unseen-email-list" class="email-list">
+                    {% for email in emails.unseen %}
+                    <li data-filename="{{ email.filename }}" data-category="unseen">{{ email.id }} - {{ email.account }} - {{ email.subject }}</li>
+                    {% endfor %}
+                </ul>
+
+                <h3>Pinned Emails</h3>
+                <ul id="pinned-email-list" class="email-list">
+                    {% for email in emails.pinned %}
+                    <li data-filename="{{ email.filename }}" data-category="pinned">{{ email.id }} - {{ email.account }} - {{ email.subject }}</li>
+                    {% endfor %}
+                </ul>
+
+                <h3>Flagged Emails</h3>
+                <ul id="flagged-email-list" class="email-list">
+                    {% for email in emails.flagged %}
+                    <li data-filename="{{ email.filename }}" data-category="flagged">{{ email.id }} - {{ email.account }} - {{ email.subject }}</li>
                     {% endfor %}
                 </ul>
             </div>
@@ -28,8 +44,9 @@
                 <div class="mt-3">
                     <button id="read-aloud-btn" class="btn btn-secondary" style="display: none;">Read Aloud</button>
                     <button id="summarize-btn" class="btn btn-info" style="display: none;">Summarize</button>
+                    <button id="toggle-flag-btn" class="btn btn-warning" style="display: none;">Unflag/Unpin</button>
                 </div>
-                  <audio id="audio" controls class="mt-3" style="display: none;"></audio>
+                <audio id="audio" controls class="mt-3" style="display: none;"></audio>
             </div>
         </div>
     </div>
@@ -38,21 +55,29 @@
     <script>
         $(document).ready(function() {
             let selectedFilename = null;
+            let selectedCategory = null;
 
-            $('#refresh-btn').click(function() {
-                $.get('/refresh', function(data) {
-                    $('#email-list').empty();
-                    data.emails.forEach(function(email) {
-                        $('#email-list').append(`<li data-filename="${email.filename}">${email.id} - ${email.account} - ${email.subject}</li>`);
+            function updateEmailLists(data) {
+                $('#unseen-email-list, #pinned-email-list, #flagged-email-list').empty();
+                ['unseen', 'pinned', 'flagged'].forEach(function(category) {
+                    data.emails[category].forEach(function(email) {
+                        $(`#${category}-email-list`).append(`<li data-filename="${email.filename}" data-category="${category}">${email.id} - ${email.account} - ${email.subject}</li>`);
                     });
                 });
-            });
+            }
 
-            $(document).on('click', '#email-list li', function() {
+            $(document).on('click', '.email-list li', function() {
                 selectedFilename = $(this).data('filename');
+                selectedCategory = $(this).data('category');
                 $.get('/read/' + selectedFilename, function(data) {
                     $('#email-content').text(data.content);
-                    $('#read-aloud-btn, #summarize-btn').show();
+                    $('#read-aloud-btn, #summarize-btn, #toggle-flag-btn').show();
+
+                    if (selectedCategory === 'unseen') {
+                        $('#toggle-flag-btn').text('Flag/Pin');
+                    } else {
+                        $('#toggle-flag-btn').text('Unflag/Unpin');
+                    }
                 });
             });
 
@@ -66,10 +91,24 @@
                     });
                 }
             });
+
             $('#summarize-btn').click(function() {
                 if (selectedFilename) {
                     $.get('/summarize/' + selectedFilename, function(data) {
                         $('#email-content').text(data.summary);
+                    });
+                }
+            });
+
+            $('#toggle-flag-btn').click(function() {
+                if (selectedFilename && selectedCategory) {
+                    $.post('/toggle_flag', { filename: selectedFilename, category: selectedCategory }, function(data) {
+                        if (data.success) {
+                            alert('Email flag/pin status updated successfully');
+                            location.reload(); // Refresh the page to update email lists
+                        } else {
+                            alert('Failed to update email flag/pin status');
+                        }
                     });
                 }
             });

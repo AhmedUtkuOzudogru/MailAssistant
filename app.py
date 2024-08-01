@@ -1,7 +1,7 @@
 import os
 import atexit
 from flask import Flask, render_template, request, jsonify
-from imap_tools import MailBox, AND
+from imap_tools import MailBox, AND, OR, NOT
 from tts import TTS
 from summarizer import Summarizer
 from main import ACCOUNTS, OPENAI_API_KEY
@@ -21,33 +21,37 @@ class EmailAssistant:
         os.makedirs('static', exist_ok=True)
 
     def fetch_emails(self):
-        emails = []
+        emails = {'unseen': [], 'pinned': [], 'flagged': []}
         email_counter = 1
         for account in ACCOUNTS:
             with MailBox(account["imap_server"], port=account["imap_port"]).login(account["username"],
                                                                                   account["password"]) as mailbox:
                 mailbox.folder.set('INBOX')
                 unseen_emails = list(mailbox.fetch(AND(seen=False)))
-                unseen_emails.sort(key=lambda x: x.date, reverse=True)
+                pinned_emails = list(mailbox.fetch(AND(flagged=True, keyword='$PIN')))
+                flagged_emails = list(mailbox.fetch(AND(flagged=True)))
 
-                for email in unseen_emails:
-                    filename = f"{email_counter}_{account['username']}.txt"
-                    full_path = os.path.join('emails', filename)
-                    with open(full_path, 'w', encoding='utf-8') as f:
-                        f.write(f"Subject: {email.subject}\n")
-                        f.write(f"From: {email.from_}\n")
-                        f.write(f"To: {', '.join(email.to)}\n")
-                        f.write(f"Date: {email.date}\n")
-                        f.write("\nBody:\n")
-                        f.write(email.text)
-                    emails.append({
-                        'id': email_counter,
-                        'account': account['username'],
-                        'from': email.from_,
-                        'subject': email.subject,
-                        'filename': filename
-                    })
-                    email_counter += 1
+                for email_list, category in [(unseen_emails, 'unseen'), (pinned_emails, 'pinned'),
+                                             (flagged_emails, 'flagged')]:
+                    email_list.sort(key=lambda x: x.date, reverse=True)
+                    for email in email_list:
+                        filename = f"{email_counter}_{account['username']}_{category}.txt"
+                        full_path = os.path.join('emails', filename)
+                        with open(full_path, 'w', encoding='utf-8') as f:
+                            f.write(f"Subject: {email.subject}\n")
+                            f.write(f"From: {email.from_}\n")
+                            f.write(f"To: {', '.join(email.to)}\n")
+                            f.write(f"Date: {email.date}\n")
+                            f.write("\nBody:\n")
+                            f.write(email.text)
+                        emails[category].append({
+                            'id': email_counter,
+                            'account': account['username'],
+                            'from': email.from_,
+                            'subject': email.subject,
+                            'filename': filename
+                        })
+                        email_counter += 1
         return emails
 
     def clear_emails(self):
@@ -84,7 +88,6 @@ class EmailAssistant:
 
 
 email_assistant = EmailAssistant()
-
 
 @app.route('/')
 def index():
@@ -126,6 +129,56 @@ def cleanup():
         if filename.endswith('.mp3'):
             os.remove(os.path.join('static', filename))
 
+
+@app.route('/toggle_flag', methods=['POST'])
+def toggle_flag():
+    filename = request.form.get('filename')
+    category = request.form.get('category')
+
+    if not filename or not category:
+        return jsonify({'success': False, 'error': 'Missing filename or category'})
+
+    try:
+        # Extract email details from filename
+        email_id, account, _ = filename.split('_')
+
+        # Find the corresponding account
+        account_info = next((acc for acc in ACCOUNTS if acc['username'] == account), None)
+        if not account_info:
+            return jsonify({'success': False, 'error': 'Account not found'})
+
+        with MailBox(account_info["imap_server"], port=account_info["imap_port"]).login(account_info["username"],
+                                                                                        account_info[
+                                                                                            "password"]) as mailbox:
+            mailbox.folder.set('INBOX')
+
+            # Find the email
+            emails = list(mailbox.fetch(AND(subject=email_id)))
+            if not emails:
+                return jsonify({'success': False, 'error': 'Email not found'})
+
+            email = emails[0]
+
+            # Toggle flag/pin status
+            current_flags = mailbox.flag(email.uid, None)  # Get current flags
+
+            if category == 'pinned':
+                if '\\Flagged' in current_flags and '$PIN' in current_flags:
+                    mailbox.flag(email.uid, ('\\Flagged', '$PIN'), False)
+                else:
+                    mailbox.flag(email.uid, ('\\Flagged', '$PIN'), True)
+            elif category == 'flagged':
+                if '\\Flagged' in current_flags:
+                    mailbox.flag(email.uid, ('\\Flagged',), False)
+                else:
+                    mailbox.flag(email.uid, ('\\Flagged',), True)
+            else:  # unseen
+                if '\\Flagged' not in current_flags and '$PIN' not in current_flags:
+                    mailbox.flag(email.uid, ('\\Flagged', '$PIN'), True)
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 # Register cleanup function with atexit
 atexit.register(cleanup)

@@ -1,0 +1,19 @@
+/* styles.css */
+body {
+    background-color: #f0f0f0;
+}
+
+h1 {
+    color: #333;
+}
+
+#email-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+#email-content {
+    border: 1px solid #ddd;
+    padding: 10px;
+    min-height: 200px;
+}

@@ -4,17 +4,17 @@ from tts import TTS
 from summarizer import Summarizer
 ACCOUNTS = [
     {
-        "username": "YOUR_EMAIL_1",
-        "password": "YOUR_PASSWORD_1",
-        "imap_server": "YOUR_SERVER_NAME_1",
+    "username": "YOUR_EMAIL_ADDRESS",
+        "password": "YOUR_EMAIL_PASSWORD",
+        "imap_server": "YOUR_IMAP_SERVER",
         "imap_port": 993
     },
-{
-        "username": "YOUR_EMAIL_2",
-        "password": "YOUR_PASSWORD_2",
-        "imap_server": "YOUR_SERVER_NAME_2",
+    {
+    "username": "YOUR_EMAIL_ADDRESS",
+        "password": "YOUR_EMAIL_PASSWORD",
+        "imap_server": "YOUR_IMAP_SERVER",
         "imap_port": 993
-    }
+    },
 
     # Add more accounts as needed
 ]
